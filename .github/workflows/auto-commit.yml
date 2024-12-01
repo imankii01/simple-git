@@ -1,6 +1,7 @@
 name: Automated Commits
 
 on:
+  workflow_dispatch:
   schedule:
     # Runs every hour
     - cron: '0 * * * *'
