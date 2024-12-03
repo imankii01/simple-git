@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const simpleGit = require('simple-git');
 const schedule = require('node-schedule');
+const express = require('express');
+const http = require('http');
 
 // Initialize Git
 const git = simpleGit();
@@ -54,7 +56,7 @@ async function automateCommit() {
     await commitAndPush(); // Commit and push the update
 }
 
-// Schedule commits at specific times
+// Schedule commits at specific times (e.g., hourly)
 const commitTimes = [
     '0 8 * * *',  // 8:00 AM
     '0 9 * * *',  // 9:00 AM
@@ -81,53 +83,66 @@ commitTimes.forEach((time) => {
     });
 });
 
-// Start the server
-const http = require('http');
+// Express App Setup
+const app = express();
 const PORT = 3000;
 
-http.createServer((req, res) => {
-    if (req.url === '/') {
-        // Root route that serves HTML to check if the server is live
-        res.writeHead(200, { 'Content-Type': 'text/html' });
-        res.end(`
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Server Status</title>
-                <style>
-                    body {
-                        font-family: Arial, sans-serif;
-                        background-color: #f4f4f9;
-                        color: #333;
-                        text-align: center;
-                        margin-top: 50px;
-                    }
-                    h1 {
-                        color: green;
-                    }
-                    p {
-                        font-size: 18px;
-                    }
-                    .status {
-                        font-size: 20px;
-                        font-weight: bold;
-                        color: #4CAF50;
-                    }
-                </style>
-            </head>
-            <body>
-                <h1>Automated Commit Server</h1>
-                <p class="status">Server is running and live!</p>
-                <p>Commit scheduling is active, and changes will be pushed automatically.</p>
-            </body>
-            </html>
-        `);
-    } else {
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('404 Not Found');
+// Middleware to parse JSON and URL-encoded data
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Root route that serves HTML to check if the server is live
+app.get('/', (req, res) => {
+    res.status(200).send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Server Status</title>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    background-color: #f4f4f9;
+                    color: #333;
+                    text-align: center;
+                    margin-top: 50px;
+                }
+                h1 {
+                    color: green;
+                }
+                p {
+                    font-size: 18px;
+                }
+                .status {
+                    font-size: 20px;
+                    font-weight: bold;
+                    color: #4CAF50;
+                }
+            </style>
+        </head>
+        <body>
+            <h1>Automated Commit Server</h1>
+            <p class="status">Server is running and live!</p>
+            <p>Commit scheduling is active, and changes will be pushed automatically.</p>
+        </body>
+        </html>
+    `);
+});
+
+// Route to manually trigger commit and push
+app.post('/trigger-commit', async (req, res) => {
+    try {
+        console.log('Manual commit triggered.');
+        await automateCommit();  // Trigger the commit and push process
+        res.status(200).send({ message: 'Commit and push successful!' });
+    } catch (error) {
+        console.error('Error during manual commit:', error);
+        res.status(500).send({ message: 'Failed to commit and push changes.' });
     }
-}).listen(PORT, () => {
+});
+
+// Start the server
+http.createServer(app).listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
