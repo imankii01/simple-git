@@ -85,7 +85,7 @@ commitTimes.forEach((time) => {
 
 // Express App Setup
 const app = express();
-const PORT = 3000;
+const PORT = 3300;
 
 // Middleware to parse JSON and URL-encoded data
 app.use(express.json());
