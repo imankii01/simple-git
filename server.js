@@ -82,9 +82,52 @@ commitTimes.forEach((time) => {
 });
 
 // Start the server
+const http = require('http');
 const PORT = 3000;
-require('http')
-    .createServer((req, res) => {
-        res.end('Automated commit server is running.');
-    })
-    .listen(PORT, () => console.log(`Server is running on port ${PORT}`));
+
+http.createServer((req, res) => {
+    if (req.url === '/') {
+        // Root route that serves HTML to check if the server is live
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(`
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Server Status</title>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        background-color: #f4f4f9;
+                        color: #333;
+                        text-align: center;
+                        margin-top: 50px;
+                    }
+                    h1 {
+                        color: green;
+                    }
+                    p {
+                        font-size: 18px;
+                    }
+                    .status {
+                        font-size: 20px;
+                        font-weight: bold;
+                        color: #4CAF50;
+                    }
+                </style>
+            </head>
+            <body>
+                <h1>Automated Commit Server</h1>
+                <p class="status">Server is running and live!</p>
+                <p>Commit scheduling is active, and changes will be pushed automatically.</p>
+            </body>
+            </html>
+        `);
+    } else {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('404 Not Found');
+    }
+}).listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
