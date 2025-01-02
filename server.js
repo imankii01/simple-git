@@ -2,147 +2,149 @@ const fs = require('fs');
 const path = require('path');
 const simpleGit = require('simple-git');
 const schedule = require('node-schedule');
-const express = require('express');
-const http = require('http');
 
-// Initialize Git
-const git = simpleGit();
+// Directory containing the repositories
+const reposFolder = path.join(__dirname, 'repo');
 
-// Directory to store the daily file
-const folderPath = path.join(__dirname, 'daily-commits');
-if (!fs.existsSync(folderPath)) {
-    fs.mkdirSync(folderPath);
-    console.log('Directory created: daily-commits');
+// Function to create a dummy .js file with legitimate-looking code
+function createDummyJsFile(repoPath) {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const filePath = path.join(repoPath, `dummy-${timestamp}.js`);
+  const content = generateDummyJsContent(filePath);
+  try {
+    fs.writeFileSync(filePath, content, 'utf8');
+    console.log(
+      `[${new Date().toISOString()}] Dummy .js file created in ${repoPath}: dummy-${timestamp}.js`
+    );
+  } catch (error) {
+    console.error(
+      `[${new Date().toISOString()}] Error creating dummy .js file in ${repoPath}:`,
+      error
+    );
+    return null;
+  }
+  return filePath;
 }
 
-// Path to the daily log file
-const today = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
-const filePath = path.join(folderPath, `log-${today}.txt`);
+// Function to generate dummy .js content with legitimate-looking code
+function generateDummyJsContent(filePath) {
+  const functions = [
+    `function helloWorld() {
+      console.log('Hello, world!');
+    }`,
+    `function add(a, b) {
+      return a + b;
+    }`,
+    `function subtract(a, b) {
+      return a - b;
+    }`,
+    `function multiply(a, b) {
+      return a * b;
+    }`,
+    `function divide(a, b) {
+      if (b === 0) {
+        throw new Error('Division by zero');
+      }
+      return a / b;
+    }`,
+  ];
+  const selectedFunctions = functions
+    .sort(() => 0.5 - Math.random())
+    .slice(0, 3)
+    .join('\n\n');
+  return `
+// filepath: ${filePath}
+${selectedFunctions}
 
-// Ensure the file exists
-if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, `Daily log for ${today}\n`, 'utf8');
-    console.log(`File created: log-${today}.txt`);
+module.exports = { helloWorld, add, subtract, multiply, divide };
+`;
 }
 
-// Function to update the file
-function updateFile() {
-    const timestamp = new Date().toLocaleString();
-    const content = `Update made at ${timestamp}\n`;
-    fs.appendFileSync(filePath, content, 'utf8');
-    console.log(`File updated with timestamp: ${timestamp}`);
+// Function to commit and push changes in a repository
+async function commitAndPush(repoPath, filePath) {
+  const git = simpleGit(repoPath);
+  try {
+    console.log(`[${new Date().toISOString()}] Starting commit and push in ${repoPath}`);
+    await git.add(filePath);
+    console.log(`[${new Date().toISOString()}] File staged in ${repoPath}`);
+
+    const message = `Auto-commit at ${new Date().toLocaleString()}`;
+    await git.commit(message);
+    console.log(
+      `[${new Date().toISOString()}] Changes committed in ${repoPath} with message: ${message}`
+    );
+
+    await git.push();
+    console.log(`[${new Date().toISOString()}] Changes pushed in ${repoPath}`);
+  } catch (error) {
+    console.error(
+      `[${new Date().toISOString()}] Error during Git operations in ${repoPath}:`,
+      error
+    );
+  }
 }
 
-// Function to commit and push the changes
-async function commitAndPush() {
-    try {
-        await git.add(filePath);
-        console.log('File staged.');
-
-        const message = `Auto-commit at ${new Date().toLocaleString()}`;
-        await git.commit(message);
-        console.log('Changes committed with message:', message);
-
-        await git.push();
-        console.log('Changes pushed to the repository.');
-    } catch (error) {
-        console.error('Error during Git operations:', error);
-    }
+// Function to randomly pick a single repository
+function pickRandomRepo(repos) {
+  const shuffled = repos.sort(() => 0.5 - Math.random());
+  return shuffled[0];
 }
 
-// Function to handle the entire process
-async function automateCommit() {
-    updateFile(); // Update the file with the current timestamp
-    await commitAndPush(); // Commit and push the update
+// Function to automate the process for a single repository
+async function automateCommitForRandomRepo() {
+  console.log(`[${new Date().toISOString()}] Starting automation for a random repository`);
+
+  if (!fs.existsSync(reposFolder)) {
+    console.error(`[${new Date().toISOString()}] Repositories folder not found: ${reposFolder}`);
+    return;
+  }
+
+  const repos = fs.readdirSync(reposFolder).filter(folder => {
+    const repoPath = path.join(reposFolder, folder);
+    return (
+      fs.statSync(repoPath).isDirectory() &&
+      fs.existsSync(path.join(repoPath, '.git'))
+    );
+  });
+
+  if (repos.length === 0) {
+    console.error(`[${new Date().toISOString()}] No repositories found to process.`);
+    return;
+  }
+
+  // Randomly pick one repository to commit
+  const randomRepo = pickRandomRepo(repos);
+  const repoPath = path.join(reposFolder, randomRepo);
+  console.log(`[${new Date().toISOString()}] Processing random repository: ${randomRepo}`);
+
+  // Create a dummy .js file
+  const dummyFilePath = createDummyJsFile(repoPath);
+  if (dummyFilePath) {
+    await commitAndPush(repoPath, dummyFilePath); // Commit and push changes
+  }
+
+  console.log(`[${new Date().toISOString()}] Finished automation for the random repository`);
 }
 
-// Schedule commits at specific times (e.g., hourly)
-const commitTimes = [
-    '0 8 * * *',  // 8:00 AM
-    '0 9 * * *',  // 9:00 AM
-    '0 10 * * *', // 10:00 AM
-    '0 11 * * *', // 11:00 AM
-    '0 12 * * *', // 12:00 PM
-    '0 13 * * *', // 1:00 PM
-    '0 14 * * *', // 2:00 PM
-    '0 15 * * *', // 3:00 PM
-    '0 16 * * *', // 4:00 PM
-    '0 17 * * *', // 5:00 PM
-    '0 18 * * *', // 6:00 PM
-    '0 19 * * *', // 7:00 PM
-    '0 20 * * *', // 8:00 PM
-    '0 21 * * *', // 9:00 PM
-    '0 22 * * *', // 10:00 PM
-];
+// Schedule 5-10 runs per day at random times
+function scheduleRandomRuns() {
+  const runCount = Math.floor(Math.random() * 6) + 5; // Random number between 5 and 10
+  console.log(`[${new Date().toISOString()}] Scheduling ${runCount} runs for today.`);
 
-// Schedule each commit
-commitTimes.forEach((time) => {
-    schedule.scheduleJob(time, () => {
-        console.log(`Scheduled commit at: ${time}`);
-        automateCommit();
+  const now = new Date();
+  for (let i = 0; i < runCount; i++) {
+    const randomHour = Math.floor(Math.random() * (23 - 9 + 1)) + 9; // Between 9 AM and 11 PM
+    const randomMinute = Math.floor(Math.random() * 60); // Any minute
+    const runTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), randomHour, randomMinute);
+
+    schedule.scheduleJob(runTime, () => {
+      console.log(`[${new Date().toISOString()}] Scheduled run triggered.`);
+      automateCommitForRandomRepo();
     });
-});
 
-// Express App Setup
-const app = express();
-const PORT = 3300;
+    console.log(`[${new Date().toISOString()}] Scheduled a run at ${runTime}`);
+  }
+}
 
-// Middleware to parse JSON and URL-encoded data
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Root route that serves HTML to check if the server is live
-app.get('/', (req, res) => {
-    res.status(200).send(`
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Server Status</title>
-            <style>
-                body {
-                    font-family: Arial, sans-serif;
-                    background-color: #f4f4f9;
-                    color: #333;
-                    text-align: center;
-                    margin-top: 50px;
-                }
-                h1 {
-                    color: green;
-                }
-                p {
-                    font-size: 18px;
-                }
-                .status {
-                    font-size: 20px;
-                    font-weight: bold;
-                    color: #4CAF50;
-                }
-            </style>
-        </head>
-        <body>
-            <h1>Automated Commit Server</h1>
-            <p class="status">Server is running and live!</p>
-            <p>Commit scheduling is active, and changes will be pushed automatically.</p>
-        </body>
-        </html>
-    `);
-});
-
-// Route to manually trigger commit and push
-app.post('/trigger-commit', async (req, res) => {
-    try {
-        console.log('Manual commit triggered.');
-        await automateCommit();  // Trigger the commit and push process
-        res.status(200).send({ message: 'Commit and push successful!' });
-    } catch (error) {
-        console.error('Error during manual commit:', error);
-        res.status(500).send({ message: 'Failed to commit and push changes.' });
-    }
-});
-
-// Start the server
-http.createServer(app).listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+// Start the scheduling
+scheduleRandomRuns();
